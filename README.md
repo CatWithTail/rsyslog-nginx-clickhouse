@@ -1,5 +1,7 @@
 # rsyslog-nginx-clickhouse
-rsyslog-nginx-clickhouse
+
+As we know, nginx writes logs about itself. We can read those logs, search something in it, parse and analyze it, make graphical interpretations. Usually, we use ELK stack: the filebeat to send logs, logstash to parse and convert and elasticsearch to store. It's normal practice, but to this, we have to install logstash. Also, we will be faced with a different problem: elasticsearch needs resources for work, and sometimes works slow. Also, kibana as GUI for elasticsearch works slow as well and don't support regular SQL syntax.
+But we have a nice solution.
 
 Main idea is:
 
