@@ -1,0 +1,15 @@
+{ "version":1, "nomatch":"unk", "type":"string",
+ "table":[ {"index":"Jan", "value":"01" },
+      {"index":"Feb", "value":"02" },
+      {"index":"Mar", "value":"03" },
+      {"index":"Apr", "value":"04" },
+      {"index":"May", "value":"05" },
+      {"index":"Jun", "value":"06" },
+      {"index":"Jul", "value":"07" },
+      {"index":"Aug", "value":"08" },
+      {"index":"Sep", "value":"09" },
+      {"index":"Oct", "value":"10" },
+      {"index":"Nov", "value":"11" },
+      {"index":"Dec", "value":"12" }
+     ]
+}
