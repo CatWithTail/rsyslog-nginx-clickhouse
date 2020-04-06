@@ -7,18 +7,18 @@ Logfiles, produced by nginx, should be parsed with the rsyslog, and put into the
 We use the grafana as GUI for the clickhouse instead of a tabix, which integrated into clickhouse. 
 access.log files -> rsyslog -> clickhouse -> grafana.
 
-1. nginx setup:
+###1. nginx setup:
 
 We have to do nothing for the basic setup. 
 Default nginx access logs format is:
-
+'''
 log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
                   '$status $body_bytes_sent "$http_referer" '
                   '"$http_user_agent" "$http_x_forwarded_for"';
-
+'''
 if the remote_user variable is empty, the '-' sets as value. 
 
-2. Rsyslog setup:
+###2. Rsyslog setup:
 
 First, we need to use pre-builded module omclickhouse. How to make this module (https://www.rsyslog.com/doc/master/configuration/modules/omclickhouse.html).
 Also, the system should contain mmnormalize module and the lognormalizer utility.
