@@ -81,7 +81,7 @@ All this rules and the template are in the same file nginx.conf:
 ```
 lookup_table(name="monthes" file="/etc/rsyslog.d/nginx.table" reloadOnHUP="off")
 template(name="ng" type="list" option.json="on") {
-  constant(value="INSERT INTO nginx.nginx (logdate, logdatetime, hostname, syslogtag, message, clientip, ident, auth, verb, request, httpv, response, bytes, referrer, agent, blob ) values ('")
+  constant(value="INSERT INTO nginx (logdate, logdatetime, hostname, syslogtag, message, clientip, ident, auth, verb, request, httpv, response, bytes, referrer, agent, blob ) values ('")
   property(name="$!year")
   constant(value="-")
   property(name="$!usr!nxm")
