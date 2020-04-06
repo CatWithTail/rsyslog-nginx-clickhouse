@@ -70,4 +70,76 @@ Create the table file /etc/rsyslog.d/nginx.table:
 }
 ```
 
+The algorithm is: 
+   1. read string from log
+   2. slice it to variables
+   3. change month format
+   4. put string to database according the template
+    
+All this rules and the template are in the same file nginx.conf:
+
+```
+lookup_table(name="monthes" file="/etc/rsyslog.d/nginx.table" reloadOnHUP="off")
+template(name="ng" type="list" option.json="on") {
+  constant(value="INSERT INTO nginx.nginx (logdate, logdatetime, hostname, syslogtag, message, clientip, ident, auth, verb, request, httpv, response, bytes, referrer, agent, blob ) values ('")
+  property(name="$!year")
+  constant(value="-")
+  property(name="$!usr!nxm")
+  constant(value="-")
+  property(name="$!day")
+  constant(value="', '")
+  property(name="$!year")
+  constant(value="-")
+  property(name="$!usr!nxm")
+  constant(value="-")
+  property(name="$!day")
+  constant(value=" ")
+  property(name="$!rtime")
+  constant(value="', '")
+  property(name="hostname")
+  constant(value="', '")
+  property(name="syslogtag")
+  constant(value="', '")
+  property(name="msg")
+  constant(value="', '")
+  property(name="$!clientip")
+  constant(value="', '")
+  property(name="$!ident")
+  constant(value="', '")
+  property(name="$!auth")
+  constant(value="', '")
+  property(name="$!verb")
+  constant(value="', '")
+  property(name="$!request")
+  constant(value="', '")
+  property(name="$!httpversion")
+  constant(value="', '")
+  property(name="$!response")
+  constant(value="', '")
+  property(name="$!bytes")
+  constant(value="', '")
+  property(name="$!referrer")
+  constant(value="', '")
+  property(name="$!agent")
+  constant(value="', '")
+  property(name="$!blob")
+  constant(value="');\n")
+}
+
+module(load="imfile")
+module(load="omclickhouse")
+module(load="mmnormalize")
+input(type="imfile" file="/var/log/nginx/access.log" tag="nginx" ruleset="norm")
+ruleset(name="norm") {
+  action(type="mmnormalize" rulebase="/etc/rsyslog.d/nginx.rule" useRawMsg="on")
+  set $!usr!nxm = lookup("monthes", $!month);
+  call out
+}
+ruleset(name="out") {
+# action(type="omfile" file="/var/log/nginx.parsed" template="ng")
+  action(type="omclickhouse" server="127.0.0.1" port="8123" 
+  usehttps="off"
+  template="ng")
+}
+```
 
