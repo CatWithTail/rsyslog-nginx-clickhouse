@@ -143,3 +143,37 @@ ruleset(name="out") {
 }
 ```
 
+### 3. Clickhouse setup:
+
+Create table for the logs in the clickhosue database: 
+```
+CREATE TABLE nginx
+(
+    `logdate` Date, 
+    `logdatetime` DateTime, 
+    `hostname` String, 
+    `syslogtag` String, 
+    `message` String, 
+    `unparsed` String, 
+    `clientip` String, 
+    `ident` String, 
+    `auth` String, 
+    `verb` String, 
+    `request` String, 
+    `httpv` String, 
+    `response` UInt16, 
+    `bytes` UInt64, 
+    `referrer` String, 
+    `agent` String, 
+    `blob` String
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMMDD(logdate)
+ORDER BY (logdate, logdatetime)
+SETTINGS index_granularity = 8192
+```
+
+(or just download file nginx.click and run:)
+```
+clickhouse-client  --query="$(cat nginx.click);";
+```
