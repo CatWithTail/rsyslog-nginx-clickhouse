@@ -175,5 +175,5 @@ SETTINGS index_granularity = 8192
 
 (or just download file nginx.click and run:)
 ```
-clickhouse-client  --query="$(cat nginx.click);";
+clickhouse-client  --query="$(cat nginx.click);"
 ```
