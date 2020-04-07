@@ -49,6 +49,7 @@ Use lognormalize to slice access logs as variables.
 Basically, nginx log looks like:
 
 127.0.0.1 - - [06/Apr/2020:09:54:48 -0400] "GET / HTTP/1.1" 200 612 "-" "curl/7.29.0" "-"
+
 We interpret it this kind:
 
 | log variable       | example   | parsed variable|  comment                         |
@@ -70,6 +71,9 @@ We interpret it this kind:
 | http_user_agent    |curl/7.29.0| referrer       |                                  | 
 |http_x_forwarded_for| -         | blob           | all after this value will be here| 
 
+it's necessary for parsing date because of nginx regular time format not acceptable for the clickhouse. Change nginx time format - could be not a good idea if some different software uses nginx's logs. 
+Also,  we have to change month format from char type into digit type then we have to put a month into a separated variable. 
+
 Create a rule for lognormalizer in file /etc/rsyslog.d/nginx.rule: 
 ```
 
@@ -77,8 +81,6 @@ version=2
 
 rule=:%clientip:word% %ident:word% %auth:word% [%day:char-to:/%/%month:char-to:/%/%year:number%:%rtime:word% %tz:char-to:]%] "%verb:word% %request:word% HTTP/%httpversion:float%" %response:number% %bytes:number% "%referrer:char-to:"%" "%agent:char-to:"%"%blob:rest%
 ```
-
-
 
 To test the rule, run: 
 ```
@@ -121,6 +123,22 @@ The algorithm is:
    3. change month format
    4. put string to database according the template
     
+    
+     
+###### The important thing about rsyslog: 
+rsyslog has different zones for variables. To transmit variable month into the variable !usr!nxm which uses in the template for output, we use separated ruleset "out" which called from the first ruleset. 
+How to write template we can find in documentation for omclickhouse above.
+Basically, the template should be looks like a regular clickhouse's "insert"  query. 
+
+For the test, we can put parsed data into some file, to check it with output rule in config:
+action(type="omfile" file="/var/log/nginx.parsed" template="ng")
+
+If everything is ok, the file should be filled with strings like this:
+```
+INSERT INTO nginx.nginx (logdate, logdatetime, hostname, syslogtag, message, clientip, ident, auth, verb, request, httpv, response, bytes, referrer, agent, blob ) values ('2020-04-07', '2020-04-07 19:21:13', 'unit', 'nginx', '127.0.0.1 - - [07/Apr/2020:19:21:13 -0400] \"GET / HTTP/1.1\" 200 612 \"-\" \"curl/7.29.0\" \"-\"', '127.0.0.1', '-', '-', 'GET', '/', '1.1', '200', '612', '-', 'curl/7.29.0', ' \"-\"');
+```
+
+
 All this rules and the template are in the same file nginx.conf:
 
 ```
