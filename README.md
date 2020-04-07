@@ -51,23 +51,24 @@ Basically, nginx log looks like:
 127.0.0.1 - - [06/Apr/2020:09:54:48 -0400] "GET / HTTP/1.1" 200 612 "-" "curl/7.29.0" "-"
 We interpret it this kind:
 
-| log variable | example | parsed variable| comment|
-| remote_addr | 127.0.0.1 | clientip|  |
-| - | - | ident| reserved variable| 
-| remote_user | - | auth | |
-| time local | 06 | day | separated to multiple values | 
-| | Apr | month | |
-| | 2020 | year | | 
-| | 09:54:48 | rtime  | |
-| | -0400 | tz | | 
-| request | GET | verb | separated as well|
-| | / | request | | 
-| | HTTP/1.1 | httpversion | |
-| status | 200 | response | |
-| body_bytes_sent | 612 | bytes | |
-| http_referer | - | referrer | | 
-| http_user_agent | curl/7.29.0 | referrer | | 
-| http_x_forwarded_for | - |  blob | all after this value will be here| 
+| log variable       | example   | parsed variable|  comment                         |
+|--------------------|:---------:|----------------|----------------------------------|
+| remote_addr        | 127.0.0.1 | clientip       |                                  |
+|        -           |     -     | ident          |reserved variable                 | 
+| remote_user        |     -     | auth           |                                  |
+| time local         |    06     | day            |separated to multiple values      | 
+|                    |   Apr     | month          |                                  |
+|                    |   2020    | year           |                                  |
+|                    | 09:54:48  | rtime          |                                  |
+|                    | -0400     | tz             |                                  | 
+| request            |   GET     | verb           | separated as well                |
+|                    | /         | request        |                                  | 
+|                    | HTTP/1.1  | httpversion    |                                  |
+| status             | 200       | response       |                                  |
+| body_bytes_sent    | 612       | bytes          |                                  |
+| http_referer       | -         | referrer       |                                  | 
+| http_user_agent    |curl/7.29.0| referrer       |                                  | 
+|http_x_forwarded_for| -         | blob           | all after this value will be here| 
 
 Create a rule for lognormalizer in file /etc/rsyslog.d/nginx.rule: 
 ```
