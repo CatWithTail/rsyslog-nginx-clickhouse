@@ -9,6 +9,9 @@ Logfiles, produced by nginx, should be parsed with the rsyslog, and put into the
 We use the grafana as GUI for the clickhouse instead of a tabix, which integrated into clickhouse. 
 access.log files -> rsyslog -> clickhouse -> grafana.
 
+We choose rsyslog, because it's a  widely distributed software for the Linux, it's simple, flexible, has a specific module for the clickhouse and already installed in centos and ubuntu distributives. 
+
+
 ### 1. nginx setup:
 
 We have to do nothing for the basic setup. 
