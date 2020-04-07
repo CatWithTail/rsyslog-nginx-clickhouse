@@ -10,6 +10,8 @@ We use the grafana as GUI for the clickhouse instead of a tabix, which integrate
 access.log files -> rsyslog -> clickhouse -> grafana.
 
 We choose rsyslog, because it's a  widely distributed software for the Linux, it's simple, flexible, has a specific module for the clickhouse and already installed in centos and ubuntu distributives. 
+Rsyslog can send log's data and receive it from multiple systems, also it can parse data and use different rulesets for different kinds of logs. 
+We choose clickhouse because it works fast for the "select" queries type, those we have to make to build graphics. Also, clickhouse can compress saved data, and clickhouse takes fewer resources then elasticsearch.
 
 
 ### 1. nginx setup:
