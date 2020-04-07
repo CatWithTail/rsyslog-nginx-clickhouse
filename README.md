@@ -24,7 +24,7 @@ log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
                   '"$http_user_agent" "$http_x_forwarded_for"';
 ```
 if the remote_user variable is empty, the '-' sets as value. 
-##### It's perfect already and we nothing to do here. 
+#### It's perfect already and we nothing to do here. 
 
 But of course, we can add to the access log format some variables,  like $upstream_addr $upstream_connect_time $upstream_header_time $upstream_response_time. If we will not use those variables as parameters for the "select" queries - we could put is after the $http_x_forwarded_for, and then we don't need to change everything else. On the other hand, if we need to use some of those variables as a parameter for the "select", then we should make a special column for this variable and a special field in a normalizer rule. 
 The text below about a default log format. 
@@ -208,7 +208,16 @@ ruleset(name="out") {
 
 ### 3. Clickhouse setup:
 
-Create table for the logs in the clickhosue database: 
+Create table for the logs in the clickhosue database.
+We using a recommended by clickhouse's developers method and engine of creation. 
+We will use specific fields: 
+logdate - for partitioning this table,
+logdatetime - for sorting data,
+hostname - name of host - log creator,
+syslogtag - tag from syslog/rsyslog,
+message - log string as is, for dump cases,
+blob - all values after agent variable. 
+
 ```
 CREATE TABLE nginx
 (
@@ -217,7 +226,6 @@ CREATE TABLE nginx
     `hostname` String, 
     `syslogtag` String, 
     `message` String, 
-    `unparsed` String, 
     `clientip` String, 
     `ident` String, 
     `auth` String, 
@@ -236,7 +244,10 @@ ORDER BY (logdate, logdatetime)
 SETTINGS index_granularity = 8192
 ```
 
-(or just download file nginx.click and run:)
+
+## It isn't necessary to read all the above! 
+####### You can copy-paste strings below, and everything should works. (If rsyslog modules were installed successfully)
+
 ```
 clickhouse-client  --query="$(cat nginx.click);"
 ```
