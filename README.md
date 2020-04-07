@@ -245,9 +245,33 @@ SETTINGS index_granularity = 8192
 ```
 
 
+### 4. Grafana setup:
+
+To prepare grafana for visualizing data from clickhouse, install the plug-in for clickhouse is enough. 
+Plugin and manual - are here: https://grafana.com/grafana/plugins/vertamedia-clickhouse-datasource
+
+Simplest request for grafana:
+```
+SELECT
+    $timeSeries as t,
+    count(*) as Count
+FROM $table
+WHERE $timeFilter 
+GROUP BY t
+ORDER BY t
+```
+
 ## It isn't necessary to read all the above! 
-####### You can copy-paste strings below, and everything should works. (If rsyslog modules were installed successfully)
+###### You can copy-paste strings below, and everything should works. (If rsyslog modules were installed successfully)
 
 ```
+git clone https://github.com/CatWithTail/rsyslog-nginx-clickhouse.git
+cd rsyslog-nginx-clickhouse
 clickhouse-client  --query="$(cat nginx.click);"
+cp nginx.{conf,rule,table} /etc/rsyslog.d/
+service rsyslog restart
 ```
+
+Enjoy! 
+
+
