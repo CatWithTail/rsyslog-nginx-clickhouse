@@ -31,11 +31,44 @@ The text below about a default log format.
 
 ### 2. Rsyslog setup:
 
-First, we need to use pre-builded module omclickhouse. How to make this module (https://www.rsyslog.com/doc/master/configuration/modules/omclickhouse.html).
-Also, the system should contain mmnormalize module and the lognormalizer utility.
+Usually, rsyslog uses as log collector, which grabs logs from a diffent places and store them according a some rules. In our case, we will also parse nginx access logs and it in clickhouse. 
 
+Rsyslog - powerful and flexible software, its functionality can be extended with different plugins. We will use three of them:
+
+1. imfile
+2. mmnormalize
+3. omclickhouse
+
+Imfile - uses to read from a file. It's an embedded module for the rsyslog. Usually, we just need to load it in the config file. 
+Mmnormalize - log normalizer plugin, uses to parse log's string as an array of values with special rules. Rules can be set in the config. Mmnormalize can be installed from the repo. Also, for the test reasons, we recommend installing lognormalizer software (for example liblognorm1, liblognorm1-utils ). 
+We will show below how we using lognormalizer for testing parse rules.
+Omclickhouse - the specific module for rsyslog, which can send logs into clickhouse. Unfortunately, it may be not in the repo yet, so it can be easily installed according to the manual: 
+https://www.rsyslog.com/doc/master/configuration/modules/omclickhouse.html 
 
 Use lognormalize to slice access logs as variables.
+Basically, nginx log looks like:
+
+127.0.0.1 - - [06/Apr/2020:09:54:48 -0400] "GET / HTTP/1.1" 200 612 "-" "curl/7.29.0" "-"
+We interpret it this kind:
+
+| log variable | example | parsed variable| comment|
+| remote_addr | 127.0.0.1 | clientip|  |
+| - | - | ident| reserved variable| 
+| remote_user | - | auth | |
+| time local | 06 | day | separated to multiple values | 
+| | Apr | month | |
+| | 2020 | year | | 
+| | 09:54:48 | rtime  | |
+| | -0400 | tz | | 
+| request | GET | verb | separated as well|
+| | / | request | | 
+| | HTTP/1.1 | httpversion | |
+| status | 200 | response | |
+| body_bytes_sent | 612 | bytes | |
+| http_referer | - | referrer | | 
+| http_user_agent | curl/7.29.0 | referrer | | 
+| http_x_forwarded_for | - |  blob | all after this value will be here| 
+
 Create a rule for lognormalizer in file /etc/rsyslog.d/nginx.rule: 
 ```
 
