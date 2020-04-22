@@ -1,105 +1,123 @@
 # rsyslog-nginx-clickhouse
 
-As we know, nginx writes logs about itself. We can read those logs, search something in it, parse and analyze it, make graphical interpretations. Usually, we use ELK stack: the filebeat to send logs, logstash to parse and convert and elasticsearch to store. It's normal practice, but to this, we have to install logstash. Also, we will be faced with a different problem: elasticsearch needs resources for work, and sometimes works slow. Also, kibana as GUI for elasticsearch works slow as well and don't support regular SQL syntax.
-But we have a nice solution.
 
-Main idea is:
-
-Logfiles, produced by nginx, should be parsed with the rsyslog, and put into the clickhouse, then they are can be used to make graphics or other reports.
-We use the grafana as GUI for the clickhouse instead of a tabix, which integrated into clickhouse. 
-access.log files -> rsyslog -> clickhouse -> grafana.
-
-We choose rsyslog, because it's a  widely distributed software for the Linux, it's simple, flexible, has a specific module for the clickhouse and already installed in centos and ubuntu distributives. 
-Rsyslog can send log's data and receive it from multiple systems, also it can parse data and use different rulesets for different kinds of logs. 
-We choose clickhouse because it works fast for the "select" queries type, those we have to make to build graphics. Also, clickhouse can compress saved data, and clickhouse takes fewer resources then elasticsearch.
+It's common knowledge that NGINX is quite capable of writing its own logs for us to read, search, parse, analyze, and visualize. A popular solution here is the ELK (ELK - elasticsearch, logstash, kibana, so why filebeat?) stack that uses Filebeat (link needed) to transport the logs, Logstash (link needed) to parse and convert them, Elasticsearch (link needed) to store the resulting data, and Kibana to visualize them nicely.
 
 
-### 1. nginx setup:
+However, this approach comes with costs at every phase. You may have to install Logstash; Elasticsearch is often resource-intensive and sometimes slow; Kibana, used as a GUI on top of Elasticsearch, also runs slowly and doesn't support regular SQL syntax. Our goal is to offer a nice solution to all of these issues.
 
-We have to do nothing for the basic setup. 
-Default nginx access logs format is:
+TL;DR
+(CONSOLE COMMANDS GO INLINE, NO GIST NEEDED)
+
+```
+git clone https://github.com/CatWithTail/rsyslog-nginx-clickhouse.git
+cd rsyslog-nginx-clickhouse
+clickhouse-client  --query="$(cat nginx.click);"
+cp nginx.{conf,rule,table} /etc/rsyslog.d/
+service rsyslog restart
+```
+
+Enjoy!
+
+
+Background
+
+
+The key idea here is to parse NGINX-generated log files with Rsyslog and feed the results to ClickHouse for visualization and reporting. On top of that, we can add Grafana as the GUI instead of ClickHouse's native Tabix client.
+
+
+(IMAGE NEEDED): access.log files -> rsyslog -> clickhouse -> grafana.
+
+
+These choices are fueled by the following considerations. First, Rsyslog is widely used on *nix systems; it's simple and flexible, has a ClickHouse module and comes pre-installed with CentOS and Ubuntu. Rsyslog can interface with multiple systems, applying various parsing rulesets for different kinds of logs. Second, ClickHouse is inherently well-suited to SELECT queries that are used in visualization. Also, it compresses stored data, requiring fewer resources than Elasticsearch.
+
+
+### 1. NGINX
+
+
+A basic setup requires no action from us; NGINX's default access log format looks like this:
+(GIST NEEDED)
 ```
 log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
                   '$status $body_bytes_sent "$http_referer" '
                   '"$http_user_agent" "$http_x_forwarded_for"';
 ```
-if the remote_user variable is empty, the '-' sets as value. 
-#### It's perfect already and we nothing to do here. 
 
-But of course, we can add to the access log format some variables,  like $upstream_addr $upstream_connect_time $upstream_header_time $upstream_response_time. If we will not use those variables as parameters for the "select" queries - we could put is after the $http_x_forwarded_for, and then we don't need to change everything else. On the other hand, if we need to use some of those variables as a parameter for the "select", then we should make a special column for this variable and a special field in a normalizer rule. 
-The text below about a default log format. 
+if the remote_user variable is empty, '-' is used in its place. There's not much to add, so nothing to do here, move along, citizen!
 
-### 2. Rsyslog setup:
 
-Usually, rsyslog uses as log collector, which grabs logs from a diffent places and store them according a some rules. In our case, we will also parse nginx access logs and it in clickhouse. 
+However, you can add some sugar with extra variables such as $upstream_addr, $upstream_connect_time, $upstream_header_time, or $upstream_response_time. If you aren't going to use them as SELECT parameters, you can safely put them after $http_x_forwarded_for to avoid breaking changes. On the other hand, if you need some of these in your SELECT queries, you'll need to create a special column and a special field in the normalizer rule for each variable.
 
-Rsyslog - powerful and flexible software, its functionality can be extended with different plugins. We will use three of them:
 
-1. imfile
-2. mmnormalize
-3. omclickhouse
+For the purposes of this article, let's assume the default log format is used.
 
-Imfile - uses to read from a file. It's an embedded module for the rsyslog. Usually, we just need to load it in the config file. 
-Mmnormalize - log normalizer plugin, uses to parse log's string as an array of values with special rules. Rules can be set in the config. Mmnormalize can be installed from the repo. Also, for the test reasons, we recommend installing lognormalizer software (for example liblognorm1, liblognorm1-utils ). 
-We will show below how we using lognormalizer for testing parse rules.
-Omclickhouse - the specific module for rsyslog, which can send logs into clickhouse. Unfortunately, it may be not in the repo yet, so it can be easily installed according to the manual: 
-https://www.rsyslog.com/doc/master/configuration/modules/omclickhouse.html 
 
-Use lognormalize to slice access logs as variables.
-Basically, nginx log looks like:
+### 2. Rsyslog
 
+
+Usually, Rsyslog serves as the log collector, picking up logs from different locations and storing them according to a set of pre-configured rules. In this case, we are parsing NGINX access logs to store them in ClickHouse. Also, mind that much of Rsyslog's functionality stems from its many plugins, or modules. Here, we suggest using three of them: imfile, mmnormalize, and omclickhouse.
+
+
+The imfile module is used to read text files; it comes embedded in Rsyslog. Usually, loading it requires only an appropriate config file setting. The ``mmnormalize`` module is used by Rsyslog to parse log strings as value arrays according to a set of rules that are set in the configuration; you can install it from this repo (LINK NEEDED). Otherwise, if only for the sake of testing, you can try other log normalizers such as liblognorm1 or liblognorm1-utils.
+
+
+Finally, omclickhouse is Rsyslog's support module that enables feeding logs to ClickHouse. Unfortunately, it may be unavailable in the repo yet, so please refer to these instructions (LINK https://www.rsyslog.com/doc/master/configuration/modules/omclickhouse.html).
+To split the access logs into variables, we use lognormalize. Basically, an NGINX log looks similar to this:
+(GIST NEEDED)
+```
 127.0.0.1 - - [06/Apr/2020:09:54:48 -0400] "GET / HTTP/1.1" 200 612 "-" "curl/7.29.0" "-"
-
-We interpret it this kind:
-
-| log variable       | example   | parsed variable|  comment                         |
-|--------------------|:---------:|----------------|----------------------------------|
-| remote_addr        | 127.0.0.1 | clientip       |                                  |
-|        -           |     -     | ident          |reserved variable                 | 
-| remote_user        |     -     | auth           |                                  |
-| time local         |    06     | day            |separated to multiple values      | 
-|                    |   Apr     | month          |                                  |
-|                    |   2020    | year           |                                  |
-|                    | 09:54:48  | rtime          |                                  |
-|                    | -0400     | tz             |                                  | 
-| request            |   GET     | verb           | separated as well                |
-|                    | /         | request        |                                  | 
-|                    | HTTP/1.1  | httpversion    |                                  |
-| status             | 200       | response       |                                  |
-| body_bytes_sent    | 612       | bytes          |                                  |
-| http_referer       | -         | referrer       |                                  | 
-| http_user_agent    |curl/7.29.0| referrer       |                                  | 
-|http_x_forwarded_for| -         | blob           | all after this value will be here| 
-
-it's necessary for parsing date because of nginx regular time format not acceptable for the clickhouse. Change nginx time format - could be not a good idea if some different software uses nginx's logs. 
-Also,  we have to change month format from char type into digit type then we have to put a month into a separated variable. 
-
-Create a rule for lognormalizer in file /etc/rsyslog.d/nginx.rule: 
 ```
 
+It can be interpreted this way:
+
+| log variable       | example   | parsed variable|  comment                       |
+|--------------------|:---------:|----------------|--------------------------------|
+| remote_addr        | 127.0.0.1 | clientip       |                                |
+|        -           |     -     | ident          |Reserved variable               | 
+| remote_user        |     -     | auth           |                                |
+| time local         |    06     | day            |Split into several values       | 
+|                    |   Apr     | month          |                                |
+|                    |   2020    | year           |                                |
+|                    | 09:54:48  | rtime          |                                |
+|                    | -0400     | tz             |                                | 
+| request            |   GET     | verb           | Split as well                  |
+|                    | /         | request        |                                | 
+|                    | HTTP/1.1  | httpversion    |                                |
+| status             | 200       | response       |                                |
+| body_bytes_sent    | 612       | bytes          |                                |
+| http_referer       | -         | referrer       |                                | 
+| http_user_agent    |curl/7.29.0| referrer       |                                | 
+|http_x_forwarded_for| -         | blob           | Contains the remaining log part| 
+
+
+Dates should be parsed because NGINX's default time format is not suitable for ClickHouse, and changing this format may not be a good idea: other software may rely on the same logs. All in all, we need to convert month values from strings to numbers, storing them in a separate variable.
+
+
+To achieve all that, let's create a ``lognormalizer`` rule in /etc/rsyslog.d/nginx.rule:
+(GIST NEEDED)
+
+```
 version=2
+
 
 rule=:%clientip:word% %ident:word% %auth:word% [%day:char-to:/%/%month:char-to:/%/%year:number%:%rtime:word% %tz:char-to:]%] "%verb:word% %request:word% HTTP/%httpversion:float%" %response:number% %bytes:number% "%referrer:char-to:"%" "%agent:char-to:"%"%blob:rest%
 ```
 
-To test the rule, run: 
+Now test the rule:
+(CONSOLE COMMANDS GO INLINE, NO GIST NEEDED)
 ```
-
 curl 127.0.0.1; tail -n 1 /var/log/nginx/access.log | lognormalizer  -r /etc/rsyslog.d/nginx.rule -e json
 ```
+The command's output should resemble the following JSON:
 
-the output should be like:
+
 ```
-
 { "blob": " \"-\"", "agent": "curl\/7.29.0", "referrer": "-", "bytes": "612", "response": "200", "httpversion": "1.1", "request": "\/", "verb": "GET", "tz": "-0400", "rtime": "09:54:48", "year": "2020", "month": "Apr", "day": "06", "auth": "-", "ident": "-", "clientip": "127.0.0.1" }
 ```
 
-
-In the data part of the string, we get also a month as word, we transform it into dight in the table part.
-
-Create the table file /etc/rsyslog.d/nginx.table:
+You can see that the month value in the data is still a string, so we should transform t it into a number using a conversion table; store the following in /etc/rsyslog.d/nginx.table:
+(GIST NEEDED)
 ```
-
 { "version":1, "nomatch":"unk", "type":"string",
  "table":[ {"index":"Jan", "value":"01" },
       {"index":"Feb", "value":"02" },
@@ -117,32 +135,36 @@ Create the table file /etc/rsyslog.d/nginx.table:
 }
 ```
 
-The algorithm is: 
-   1. read string from log
-   2. slice it to variables
-   3. change month format
-   4. put string to database according the template
-    
-    
-     
-###### The important thing about rsyslog: 
-rsyslog has different zones for variables. To transmit variable month into the variable !usr!nxm which uses in the template for output, we use separated ruleset "out" which called from the first ruleset. 
-How to write template we can find in documentation for omclickhouse above.
-Basically, the template should be looks like a regular clickhouse's "insert"  query. 
+This means we end up with the following algorithm:
 
-For the test, we can put parsed data into some file, to check it with output rule in config:
+
+	•	Read a log row
+	•	Split it into separate variables
+	•	Convert month value to the new format
+	•	Store the data in the database using a template
+
+
+NOTE ADMONITION:
+Mind that Rsyslog has different zones for variables. To feed our month value into the !usr!nxm variable that is used in the template, we need to use a separate "out" ruleset that is invoked by the first ruleset. Instructions on writing templates can be found in omclickhouse documentation (LINK NEEDED); basically, a ClickHouse template looks like a common INSERT query.
+
+
+For testin purposes, we can put some parsed data into a file and check it using the output rule in config:
+(GIST NEEDED)
+```
 action(type="omfile" file="/var/log/nginx.parsed" template="ng")
+```
 
-If everything is ok, the file should be filled with strings like this:
+If everything goes OK, the file will contain something like this:
+(GIST NEEDED)
 ```
 INSERT INTO nginx.nginx (logdate, logdatetime, hostname, syslogtag, message, clientip, ident, auth, verb, request, httpv, response, bytes, referrer, agent, blob ) values ('2020-04-07', '2020-04-07 19:21:13', 'unit', 'nginx', '127.0.0.1 - - [07/Apr/2020:19:21:13 -0400] \"GET / HTTP/1.1\" 200 612 \"-\" \"curl/7.29.0\" \"-\"', '127.0.0.1', '-', '-', 'GET', '/', '1.1', '200', '612', '-', 'curl/7.29.0', ' \"-\"');
 ```
 
-
-All this rules and the template are in the same file nginx.conf:
+The rules and the template are stored in the same nginx.conf file:
+(GIST NEEDED)
 
 ```
-lookup_table(name="monthes" file="/etc/rsyslog.d/nginx.table" reloadOnHUP="off")
+lookup_table(name="months" file="/etc/rsyslog.d/nginx.table" reloadOnHUP="off")
 template(name="ng" type="list" option.json="on") {
   constant(value="INSERT INTO nginx (logdate, logdatetime, hostname, syslogtag, message, clientip, ident, auth, verb, request, httpv, response, bytes, referrer, agent, blob ) values ('")
   property(name="$!year")
@@ -195,83 +217,71 @@ module(load="mmnormalize")
 input(type="imfile" file="/var/log/nginx/access.log" tag="nginx" ruleset="norm")
 ruleset(name="norm") {
   action(type="mmnormalize" rulebase="/etc/rsyslog.d/nginx.rule" useRawMsg="on")
-  set $!usr!nxm = lookup("monthes", $!month);
+  set $!usr!nxm = lookup("months", $!month);
   call out
 }
 ruleset(name="out") {
 # action(type="omfile" file="/var/log/nginx.parsed" template="ng")
-  action(type="omclickhouse" server="127.0.0.1" port="8123" 
+  action(type="omclickhouse" server="127.0.0.1" port="8123"
   usehttps="off"
   template="ng")
 }
 ```
 
-### 3. Clickhouse setup:
 
-Create table for the logs in the clickhosue database.
-We using a recommended by clickhouse's developers method and engine of creation. 
-We will use specific fields: 
-logdate - for partitioning this table,
-logdatetime - for sorting data,
-hostname - name of host - log creator,
-syslogtag - tag from syslog/rsyslog,
-message - log string as is, for dump cases,
-blob - all values after agent variable. 
+### 3. ClickHouse
 
+
+Next, let's create a table to store log data in the ClickHouse database. For this, we employ the developer-recommended method, adding a few designated fields:
+	•	logdate - to partition the table
+	•	logdatetime - to sort data
+	•	hostname - to store the log creator host name
+	•	syslogtag - to store the tag from syslog/Rsyslog
+	•	message - to store the raw log data in case a dump is needed
+	•	blob - to store all values that follow the agent variable
+
+
+The resulting query:
+(GIST NEEDED)
 ```
 CREATE TABLE nginx
 (
-    `logdate` Date, 
-    `logdatetime` DateTime, 
-    `hostname` String, 
-    `syslogtag` String, 
-    `message` String, 
-    `clientip` String, 
-    `ident` String, 
-    `auth` String, 
-    `verb` String, 
-    `request` String, 
-    `httpv` String, 
-    `response` UInt16, 
-    `bytes` UInt64, 
-    `referrer` String, 
-    `agent` String, 
+    `logdate` Date,
+    `logdatetime` DateTime,
+    `hostname` String,
+    `syslogtag` String,
+    `message` String,
+    `clientip` String,
+    `ident` String,
+    `auth` String,
+    `verb` String,
+    `request` String,
+    `httpv` String,
+    `response` UInt16,
+    `bytes` UInt64,
+    `referrer` String,
+    `agent` String,
     `blob` String
 )
 ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(logdate)
 ORDER BY (logdate, logdatetime)
 SETTINGS index_granularity = 8192
+
 ```
 
+Grafana
+Finally, to make Grafana consume data from ClickHouse for visualization, we need to install the ClickHouse plugin (LINK https://grafana.com/grafana/plugins/vertamedia-clickhouse-datasource) and use it with the simplest query:
 
-### 4. Grafana setup:
 
-To prepare grafana for visualizing data from clickhouse, install the plug-in for clickhouse is enough. 
-Plugin and manual - are here: https://grafana.com/grafana/plugins/vertamedia-clickhouse-datasource
-
-Simplest request for grafana:
 ```
 SELECT
     $timeSeries as t,
     count(*) as Count
 FROM $table
-WHERE $timeFilter 
+WHERE $timeFilter
 GROUP BY t
 ORDER BY t
 ```
 
-## It isn't necessary to read all the above! 
-###### You can copy-paste strings below, and everything should works. (If rsyslog modules were installed successfully)
-
-```
-git clone https://github.com/CatWithTail/rsyslog-nginx-clickhouse.git
-cd rsyslog-nginx-clickhouse
-clickhouse-client  --query="$(cat nginx.click);"
-cp nginx.{conf,rule,table} /etc/rsyslog.d/
-service rsyslog restart
-```
-
-Enjoy! 
-
-
+That's basically it. Parse your logs, stay home, stay NGINX!
