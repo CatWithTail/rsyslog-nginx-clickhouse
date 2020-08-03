@@ -210,6 +210,7 @@ template(name="ng" type="list" option.json="on") {
   property(name="$!blob")
   constant(value="');\n")
 }
+# if clickhouse version <20, remove ' near the UNIT values
 
 module(load="imfile")
 module(load="omclickhouse")
